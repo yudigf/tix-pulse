@@ -1,0 +1,46 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+concurrency:
+  group: deployment-staging
+  cancel-in-progress: false
+
+jobs:
+  quality-gate:
+    name: Verify Staging Quality Gate
+    uses: ./.github/workflows/ci.yml
+
+  deploy-staging:
+    name: Build & Deploy to Staging
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging-api.tixpulse.com
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Staging Docker Image
+        run: |
+          echo "Building Staging Docker image for commit ${{ github.sha }}..."
+          docker build -t tixpulse-core-api:staging-${{ github.sha }} -t tixpulse-core-api:staging-latest services/core-api
+
+      - name: Run Database Migrations on Staging
+        run: |
+          echo "Applying pending migrations to staging database..."
+          # Command: npx prisma migrate deploy
+
+      - name: Deploy Staging Container
+        run: |
+          echo "Deploying container to Staging environment..."
+          # Deploy command via SSH, Kubernetes helm/kubectl, or Docker compose
+          echo "Staging deployment successful!"

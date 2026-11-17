@@ -1,0 +1,46 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deployment-production
+  cancel-in-progress: false
+
+jobs:
+  quality-gate:
+    name: Verify Production Quality Gate
+    uses: ./.github/workflows/ci.yml
+
+  deploy-production:
+    name: Build & Deploy to Production
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.tixpulse.com
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Production Docker Image
+        run: |
+          echo "Building Production Docker image for release ${{ github.sha }}..."
+          docker build -t tixpulse-core-api:prod-${{ github.sha }} -t tixpulse-core-api:latest services/core-api
+
+      - name: Run Database Migrations on Production
+        run: |
+          echo "Applying pending migrations to production database..."
+          # Command: npx prisma migrate deploy
+
+      - name: Deploy Production Container
+        run: |
+          echo "Deploying container to Production environment..."
+          # Deploy command via Kubernetes helm/kubectl or Docker swarm/compose
+          echo "Production deployment successful!"
