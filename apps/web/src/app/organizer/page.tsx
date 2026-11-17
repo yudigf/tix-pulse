@@ -1,10 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { PlusCircle, TrendingUp, Users, Ticket, Calendar, DollarSign, ArrowUpRight, BarChart3, ScanLine } from 'lucide-react';
+import { PlusCircle, TrendingUp, Users, Ticket, Calendar, DollarSign, ArrowUpRight, BarChart3, ScanLine, Building2 } from 'lucide-react';
 
 export default function OrganizerDashboard() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('tixpulse_user');
+      if (stored) {
+        try {
+          setCurrentUser(JSON.parse(stored));
+        } catch {
+          setCurrentUser(null);
+        }
+      }
+    }
+  }, []);
+
   const events = [
     {
       id: 'evt-1',
@@ -33,8 +48,18 @@ export default function OrganizerDashboard() {
       {/* Dashboard Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Dashboard Event Organizer</h1>
-          <p className="text-xs text-slate-500">Kelola penjualan tiket, kuota real-time, dan laporan pendapatan Anda</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black text-slate-900">Dashboard Event Organizer</h1>
+            {currentUser?.organizer?.name && (
+              <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5" />
+                {currentUser.organizer.name}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Selamat datang kembali, <strong>{currentUser?.fullName || 'Event Organizer'}</strong>. Kelola penjualan tiket dan kuota secara real-time.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -93,7 +118,7 @@ export default function OrganizerDashboard() {
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-900">Daftar Event Anda</h2>
-          <span className="text-xs text-slate-400">Menampilkan 2 event</span>
+          <span className="text-xs text-slate-400">Menampilkan 2 event aktif</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -147,4 +172,3 @@ export default function OrganizerDashboard() {
     </div>
   );
 }
-

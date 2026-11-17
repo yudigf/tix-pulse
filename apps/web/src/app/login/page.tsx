@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Ticket, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Ticket, Mail, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,11 +11,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccessMsg('');
 
     try {
       const res = await fetch('http://localhost:3000/api/v1/auth/login', {
@@ -26,14 +28,28 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Login gagal');
+        throw new Error(data.message || 'Email atau password salah');
       }
 
+      // Save token and user info
       localStorage.setItem('tixpulse_token', data.accessToken);
       localStorage.setItem('tixpulse_user', JSON.stringify(data.user));
-      router.push('/');
+
+      // Trigger custom auth event so Navbar updates immediately
+      window.dispatchEvent(new Event('auth-change'));
+
+      setSuccessMsg(`Login berhasil! Selamat datang, ${data.user.fullName}.`);
+
+      // Smart redirection based on user role
+      setTimeout(() => {
+        if (data.user.role === 'ORGANIZER' || data.user.role === 'SUPER_ADMIN') {
+          router.push('/organizer');
+        } else {
+          router.push('/');
+        }
+      }, 700);
     } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan');
+      setError(err.message || 'Terjadi kesalahan saat login');
     } finally {
       setLoading(false);
     }
@@ -53,6 +69,13 @@ export default function LoginPage() {
         {error && (
           <div className="p-3 bg-rose-50 text-rose-700 text-xs rounded-xl border border-rose-200">
             {error}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="p-3 bg-emerald-50 text-emerald-700 text-xs rounded-xl border border-emerald-200 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{successMsg}</span>
           </div>
         )}
 
@@ -107,4 +130,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
