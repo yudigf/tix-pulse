@@ -10,10 +10,322 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Baseline sanity check model
+// ==========================================
+// 1. AUTH & USER ROLES
+// ==========================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ORGANIZER
+  STAFF
+  BUYER
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  phoneNumber  String?
+  role         UserRole  @default(BUYER)
+  isVerified   Boolean   @default(false)
+  organizer    Organizer?
+  orders       Order[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Organizer {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  slug              String   @unique
+  description       String?
+  logoUrl           String?
+  website           String?
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountName   String?
+  isVerified        Boolean  @default(false)
+  events            Event[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("organizers")
+}
+
+// ==========================================
+// 2. EVENT & SESSIONS
+// ==========================================
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum EventCategory {
+  CONCERT
+  SEMINAR
+  SPORTS
+  FESTIVAL
+  THEATER
+  OUTDOOR
+  EXHIBITION
+  OTHER
+}
+
+enum TicketMode {
+  GENERAL_ADMISSION // Quota-based tickets (Festivals, Seminars, Hiking)
+  RESERVED_SEATING  // Seat map-based tickets (Concerts, Theaters)
+}
+
+model Event {
+  id                 String         @id @default(uuid())
+  organizerId        String
+  organizer          Organizer      @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  title              String
+  slug               String         @unique
+  description        String
+  category           EventCategory  @default(OTHER)
+  status             EventStatus    @default(DRAFT)
+  bannerUrl          String?
+  venueName          String
+  venueAddress       String
+  city               String
+  termsAndConditions String?
+  ticketMode         TicketMode     @default(GENERAL_ADMISSION)
+  sessions           EventSession[]
+  orders             Order[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@map("events")
+}
+
+model EventSession {
+  id          String       @id @default(uuid())
+  eventId     String
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title       String       // e.g. "Day 1 - Session Morning"
+  startTime   DateTime
+  endTime     DateTime
+  ticketTypes TicketType[]
+  seats       Seat[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("event_sessions")
+}
+
+// ==========================================
+// 3. INVENTORY: TICKET TYPES & SEATS
+// ==========================================
+
+model TicketType {
+  id          String       @id @default(uuid())
+  sessionId   String
+  session     EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name        String       // e.g. "VIP", "Festival Standing", "Regular"
+  description String?
+  price       Int          // Stored in Indonesian Rupiah (Integer, no decimal bugs)
+  quota       Int          // Total stock available for General Admission
+  soldCount   Int          @default(0)
+  maxPerOrder Int          @default(5)
+  saleStart   DateTime
+  saleEnd     DateTime
+  isActive    Boolean      @default(true)
+  seats       Seat[]
+  orderItems  OrderItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("ticket_types")
+}
+
+enum SeatStatus {
+  AVAILABLE
+  LOCKED
+  SOLD
+  BLOCKED
+}
+
+model Seat {
+  id             String       @id @default(uuid())
+  sessionId      String
+  session        EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  ticketTypeId   String
+  ticketType     TicketType   @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  seatCode       String       // e.g. "VIP-A1", "CAT1-B12"
+  row            String?      // e.g. "A", "B"
+  col            Int?         // e.g. 1, 2
+  status         SeatStatus   @default(AVAILABLE)
+  lockedByUserId String?
+  lockedUntil    DateTime?
+  orderItems     OrderItem[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([sessionId, seatCode])
+  @@map("seats")
+}
+
+// ==========================================
+// 4. ORDER & CHECKOUT
+// ==========================================
+
+enum OrderStatus {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique // e.g. "TXP-20261117-XXXX"
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  eventId     String
+  event       Event       @relation(fields: [eventId], references: [id])
+  status      OrderStatus @default(PENDING)
+  totalAmount Int
+  expiresAt   DateTime    // 15-minute checkout TTL
+  paidAt      DateTime?
+  items       OrderItem[]
+  payments    Payment[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String     @id @default(uuid())
+  orderId      String
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketTypeId String
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id])
+  seatId       String?
+  seat         Seat?      @relation(fields: [seatId], references: [id])
+  price        Int
+  attendee     Attendee?
+  ticket       Ticket?
+  createdAt    DateTime   @default(now())
+
+  @@map("order_items")
+}
+
+model Attendee {
+  id             String    @id @default(uuid())
+  orderItemId    String    @unique
+  orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  fullName       String
+  email          String
+  phoneNumber    String?
+  identityNumber String?   // NIK, Passport, or Student ID
+  createdAt      DateTime  @default(now())
+
+  @@map("attendees")
+}
+
+// ==========================================
+// 5. PAYMENT & TRANSACTIONS
+// ==========================================
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider       String        // "MIDTRANS", "XENDIT", "MANUAL_SANDBOX"
+  paymentType    String?       // "QRIS", "BCA_VA", "GOPAY", "CREDIT_CARD"
+  transactionId  String?
+  amount         Int
+  status         PaymentStatus @default(PENDING)
+  paymentUrl     String?
+  vaNumber       String?
+  qrCodeString   String?
+  rawResponse    Json?
+  idempotencyKey String?       @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+// ==========================================
+// 6. TICKETING & VALIDATION (CHECK-IN)
+// ==========================================
+
+enum TicketStatus {
+  VALID
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+model Ticket {
+  id          String       @id @default(uuid())
+  ticketCode  String       @unique // Public e-ticket code e.g. "TXP-TK-XXXX"
+  orderItemId String       @unique
+  orderItem   OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  qrPayload   String       // Cryptographically signed JWT/HMAC token for offline validation
+  status      TicketStatus @default(VALID)
+  pdfUrl      String?
+  checkIns    CheckIn[]
+  issuedAt    DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("tickets")
+}
+
+model CheckIn {
+  id            String   @id @default(uuid())
+  ticketId      String
+  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  scannedAt     DateTime @default(now())
+  scannedBy     String?  // Staff User ID or Device ID
+  gateName      String?  // e.g. "Gate 1 - North"
+  isOfflineSync Boolean  @default(false)
+
+  @@map("check_ins")
+}
+
+// ==========================================
+// 7. TRANSACTIONAL OUTBOX & AUDIT
+// ==========================================
+
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  eventType   String    // e.g. "order.paid", "ticket.issued", "seat.released"
+  payload     Json
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  retryCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@map("outbox_events")
+}
+
 model SystemHealth {
   id        String   @id @default(uuid())
   status    String   @default("HEALTHY")
   checkedAt DateTime @default(now())
-}
 
+  @@map("system_health")
+}
