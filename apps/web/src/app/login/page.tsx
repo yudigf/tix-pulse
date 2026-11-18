@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Ticket, Mail, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Ticket, Mail, Lock, ArrowRight, CheckCircle2, UserCheck, LogOut } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +12,38 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [alreadyUser, setAlreadyUser] = useState<any>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('tixpulse_user');
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          setAlreadyUser(user);
+          // Auto redirect to appropriate page
+          const redirectTarget = user.role === 'ORGANIZER' || user.role === 'SUPER_ADMIN' ? '/organizer' : '/';
+          router.replace(redirectTarget);
+          return;
+        } catch {
+          // invalid stored json
+        }
+      }
+      setIsCheckingAuth(false);
+    }
+  }, [router]);
+
+  const handleLogoutAndSwitch = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('tixpulse_token');
+      localStorage.removeItem('tixpulse_user');
+      window.dispatchEvent(new Event('auth-change'));
+      setAlreadyUser(null);
+      setIsCheckingAuth(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +86,59 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // If already logged in, show clear redirect & switch account card
+  if (alreadyUser) {
+    const targetUrl = alreadyUser.role === 'ORGANIZER' || alreadyUser.role === 'SUPER_ADMIN' ? '/organizer' : '/';
+    const targetLabel = alreadyUser.role === 'ORGANIZER' || alreadyUser.role === 'SUPER_ADMIN' ? 'Dashboard EO' : 'Katalog Tiket';
+
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 space-y-6">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100 shadow-sm">
+            <UserCheck className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-xl font-black text-slate-900">Anda Sudah Masuk</h2>
+            <p className="text-xs text-slate-500">
+              Saat ini Anda login sebagai <strong>{alreadyUser.fullName}</strong> ({alreadyUser.role}).
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
+            Mengalihkan Anda secara otomatis ke <strong>{targetLabel}</strong>...
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Link
+              href={targetUrl}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+            >
+              <span>Lanjut ke {targetLabel}</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+
+            <button
+              onClick={handleLogoutAndSwitch}
+              className="w-full py-3 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-4 h-4 text-slate-400" />
+              <span>Ganti Akun Lain (Keluar)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-28 text-center text-xs text-slate-400">
+        Memeriksa sesi login...
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto px-4 py-16 space-y-8">
