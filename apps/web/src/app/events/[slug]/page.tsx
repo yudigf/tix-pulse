@@ -1,39 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Calendar, MapPin, ShieldCheck, Ticket, Users, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
-import { SAMPLE_EVENTS, EventItem } from '@/lib/sample-data';
+import { SAMPLE_EVENTS } from '@/lib/sample-data';
 
 export default function EventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
 
-  const event = SAMPLE_EVENTS.find((e) => e.slug === slug) || SAMPLE_EVENTS[0];
+  const [eventData, setEventData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    fetch(`http://localhost:3000/api/v1/events/${slug}`)
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.title) {
+          setEventData(data);
+        }
+      })
+      .catch(() => {
+        const fallback = SAMPLE_EVENTS.find((e) => e.slug === slug) || SAMPLE_EVENTS[0];
+        setEventData(fallback);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [slug]);
+
+  const event = eventData || SAMPLE_EVENTS.find((e) => e.slug === slug) || SAMPLE_EVENTS[0];
+  const sessions = event.sessions || [];
   const [activeSessionIndex, setActiveSessionIndex] = useState(0);
-  const currentSession = event.sessions[activeSessionIndex] || event.sessions[0];
+  const currentSession = sessions[activeSessionIndex] || sessions[0] || {
+    id: 'default',
+    title: 'Sesi Utama',
+    ticketTypes: [],
+    seats: [],
+  };
 
   // Ticket quantities state: { [ticketTypeId]: number }
   const [quantities, setQuantities] = useState<{ [id: string]: number }>({});
   // Selected seats state: string[]
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
 
-  // Simulated seat map for Reserved Seating
-  const sampleSeats = [
-    { code: 'VIP-A1', row: 'A', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-A2', row: 'A', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-A3', row: 'A', status: 'SOLD', price: 850000 },
-    { code: 'VIP-A4', row: 'A', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-A5', row: 'A', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-B1', row: 'B', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-B2', row: 'B', status: 'SOLD', price: 850000 },
-    { code: 'VIP-B3', row: 'B', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-B4', row: 'B', status: 'AVAILABLE', price: 850000 },
-    { code: 'VIP-B5', row: 'B', status: 'AVAILABLE', price: 850000 },
-  ];
+  // Seats from DB or fallback
+  const seatsList = (currentSession.seats && currentSession.seats.length > 0)
+    ? currentSession.seats
+    : [
+        { seatCode: 'VIP-A1', row: 'A', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-A2', row: 'A', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-A3', row: 'A', status: 'SOLD', price: 850000 },
+        { seatCode: 'VIP-A4', row: 'A', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-A5', row: 'A', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-B1', row: 'B', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-B2', row: 'B', status: 'SOLD', price: 850000 },
+        { seatCode: 'VIP-B3', row: 'B', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-B4', row: 'B', status: 'AVAILABLE', price: 850000 },
+        { seatCode: 'VIP-B5', row: 'B', status: 'AVAILABLE', price: 850000 },
+      ];
 
   const handleQuantityChange = (ticketId: string, delta: number, max: number) => {
     const current = quantities[ticketId] || 0;
@@ -55,9 +85,10 @@ export default function EventDetailPage() {
 
   if (event.ticketMode === 'RESERVED_SEATING' && selectedSeats.length > 0) {
     totalTickets = selectedSeats.length;
-    totalPrice = selectedSeats.length * 850000;
-  } else {
-    currentSession.ticketTypes.forEach((t) => {
+    const seatPrice = currentSession.ticketTypes?.[0]?.price || 850000;
+    totalPrice = selectedSeats.length * seatPrice;
+  } else if (currentSession.ticketTypes) {
+    currentSession.ticketTypes.forEach((t: any) => {
       const q = quantities[t.id] || 0;
       totalTickets += q;
       totalPrice += q * t.price;
@@ -66,7 +97,6 @@ export default function EventDetailPage() {
 
   const handleProceedToCheckout = () => {
     if (totalTickets === 0) return;
-    // Store in localStorage for checkout prototype flow
     const checkoutData = {
       eventTitle: event.title,
       eventSlug: event.slug,
@@ -103,7 +133,7 @@ export default function EventDetailPage() {
               </span>
               <h1 className="text-2xl sm:text-4xl font-extrabold leading-tight">{event.title}</h1>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-200 pt-1">
-                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-amber-300" /> {event.dateString}</span>
+                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-amber-300" /> {event.dateString || 'Segera Hadir'}</span>
                 <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-rose-400" /> {event.venueName}, {event.city}</span>
               </div>
             </div>
@@ -117,10 +147,8 @@ export default function EventDetailPage() {
               </div>
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-sm text-slate-900">
-                  {event.organizer.name}
-                  {event.organizer.verified && (
-                    <CheckCircle2 className="w-4 h-4 text-indigo-600" />
-                  )}
+                  {event.organizer?.name || 'Penyelenggara Event'}
+                  <CheckCircle2 className="w-4 h-4 text-indigo-600" />
                 </div>
                 <span className="text-xs text-slate-400">Penyelenggara Resmi Terverifikasi</span>
               </div>
@@ -149,9 +177,9 @@ export default function EventDetailPage() {
             </div>
 
             {/* Session Tabs */}
-            {event.sessions.length > 1 && (
+            {sessions.length > 1 && (
               <div className="flex gap-2 border-b border-slate-100 pb-3">
-                {event.sessions.map((sess, idx) => (
+                {sessions.map((sess: any, idx: number) => (
                   <button
                     key={sess.id}
                     onClick={() => {
@@ -182,14 +210,15 @@ export default function EventDetailPage() {
                 <div className="pt-4 flex flex-col items-center gap-3">
                   <span className="text-xs font-semibold text-slate-600">Pilih Kursi VIP (Klik untuk memilih):</span>
                   <div className="grid grid-cols-5 gap-3">
-                    {sampleSeats.map((seat) => {
-                      const isSelected = selectedSeats.includes(seat.code);
+                    {seatsList.map((seat: any) => {
+                      const code = seat.seatCode || seat.code;
+                      const isSelected = selectedSeats.includes(code);
                       const isSold = seat.status === 'SOLD';
                       return (
                         <button
-                          key={seat.code}
+                          key={code}
                           disabled={isSold}
-                          onClick={() => toggleSeat(seat.code)}
+                          onClick={() => toggleSeat(code)}
                           className={`w-14 h-12 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition-all ${
                             isSold
                               ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
@@ -198,8 +227,8 @@ export default function EventDetailPage() {
                               : 'bg-white text-slate-700 hover:border-indigo-400 border border-slate-300 shadow-sm'
                           }`}
                         >
-                          <span>{seat.code}</span>
-                          <span className="text-[9px] font-normal">{isSold ? 'Habis' : '850K'}</span>
+                          <span>{code}</span>
+                          <span className="text-[9px] font-normal">{isSold ? 'Habis' : 'Tersedia'}</span>
                         </button>
                       );
                     })}
@@ -217,9 +246,9 @@ export default function EventDetailPage() {
 
             {/* General Admission Ticket Cards List */}
             <div className="space-y-4">
-              {currentSession.ticketTypes.map((tix) => {
+              {currentSession.ticketTypes?.map((tix: any) => {
                 const qty = quantities[tix.id] || 0;
-                const remaining = tix.quota - tix.soldCount;
+                const remaining = (tix.quota || 0) - (tix.soldCount || 0);
                 return (
                   <div
                     key={tix.id}
@@ -232,14 +261,14 @@ export default function EventDetailPage() {
                           Sisa {remaining} tiket
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500">{tix.description}</p>
+                      <p className="text-xs text-slate-500">{tix.description || 'Akses masuk event resmi.'}</p>
                       <span className="text-base font-extrabold text-indigo-600 block pt-1">
                         Rp {tix.price.toLocaleString('id-ID')}
                       </span>
                     </div>
 
                     {/* Quantity Selector */}
-                    {event.ticketMode === 'GENERAL_ADMISSION' && (
+                    {event.ticketMode !== 'RESERVED_SEATING' && (
                       <div className="flex items-center gap-3 bg-slate-100 p-1.5 rounded-xl self-end sm:self-center">
                         <button
                           onClick={() => handleQuantityChange(tix.id, -1, 5)}
@@ -312,4 +341,3 @@ export default function EventDetailPage() {
     </div>
   );
 }
-

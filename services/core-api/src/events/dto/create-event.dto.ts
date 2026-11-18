@@ -28,10 +28,10 @@ export class CreateEventDto {
   @IsNotEmpty({ message: 'Nama venue wajib diisi' })
   venueName: string;
 
-  @ApiProperty({ example: 'Jl. Pintu Satu Senayan, Gelora', description: 'Alamat lengkap venue' })
+  @ApiPropertyOptional({ example: 'Jl. Pintu Satu Senayan, Gelora', description: 'Alamat lengkap venue' })
   @IsString()
-  @IsNotEmpty({ message: 'Alamat venue wajib diisi' })
-  venueAddress: string;
+  @IsOptional()
+  venueAddress?: string;
 
   @ApiProperty({ example: 'Jakarta Pusat', description: 'Kota pelaksanaan' })
   @IsString()
@@ -51,4 +51,17 @@ export class CreateEventDto {
   @IsEnum(TicketMode)
   @IsOptional()
   ticketMode?: TicketMode;
+
+  @ApiPropertyOptional({ example: 'Presale 1', description: 'Nama kategori tiket awal' })
+  @IsString()
+  @IsOptional()
+  ticketName?: string;
+
+  @ApiPropertyOptional({ example: 250000, description: 'Harga tiket (Rupiah)' })
+  @IsOptional()
+  price?: number;
+
+  @ApiPropertyOptional({ example: 500, description: 'Total kuota lembar tiket' })
+  @IsOptional()
+  quota?: number;
 }

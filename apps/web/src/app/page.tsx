@@ -1,14 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Calendar, MapPin, Tag, ShieldCheck, Zap, Sparkles, ArrowRight, Compass } from 'lucide-react';
-import { SAMPLE_EVENTS, EventItem } from '@/lib/sample-data';
+import { SAMPLE_EVENTS } from '@/lib/sample-data';
 
 export default function HomePage() {
+  const [eventsList, setEventsList] = useState<any[]>(SAMPLE_EVENTS);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    fetch('http://localhost:3000/api/v1/events')
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setEventsList(data);
+        }
+      })
+      .catch(() => {
+        // Fallback to sample data if offline
+      });
+  }, []);
 
   const categories = [
     { key: 'ALL', label: '🔥 Semua Event' },
@@ -18,12 +34,12 @@ export default function HomePage() {
     { key: 'SPORTS', label: '🏸 Turnamen Olahraga' },
   ];
 
-  const filteredEvents = SAMPLE_EVENTS.filter((evt) => {
+  const filteredEvents = eventsList.filter((evt) => {
     const matchCategory = selectedCategory === 'ALL' || evt.category === selectedCategory;
     const matchQuery =
-      evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evt.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evt.venueName.toLowerCase().includes(searchQuery.toLowerCase());
+      (evt.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (evt.city || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (evt.venueName || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchCategory && matchQuery;
   });
 
@@ -119,7 +135,7 @@ export default function HomePage() {
                   <div className="space-y-1 text-xs text-slate-500">
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                      <span className="truncate">{evt.dateString}</span>
+                      <span className="truncate">{evt.dateString || 'Segera Hadir'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
@@ -132,7 +148,7 @@ export default function HomePage() {
                   <div>
                     <span className="text-[10px] text-slate-400 block font-medium">Mulai Dari</span>
                     <span className="text-base font-extrabold text-indigo-600">
-                      Rp {evt.priceStart.toLocaleString('id-ID')}
+                      Rp {(evt.priceStart || 250000).toLocaleString('id-ID')}
                     </span>
                   </div>
                   <span className="p-2 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
@@ -188,4 +204,3 @@ export default function HomePage() {
     </div>
   );
 }
-

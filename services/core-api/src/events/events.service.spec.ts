@@ -8,8 +8,12 @@ import { EventStatus, EventCategory, TicketMode } from '@prisma/client';
 describe('EventsService', () => {
   let service: EventsService;
   let prisma: {
+    user: {
+      findUnique: ReturnType<typeof vi.fn>;
+    };
     organizer: {
       findUnique: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
     };
     event: {
       create: ReturnType<typeof vi.fn>;
@@ -23,12 +27,19 @@ describe('EventsService', () => {
     ticketType: {
       create: ReturnType<typeof vi.fn>;
     };
+    seat: {
+      createMany: ReturnType<typeof vi.fn>;
+    };
   };
 
   beforeEach(async () => {
     prisma = {
+      user: {
+        findUnique: vi.fn(),
+      },
       organizer: {
         findUnique: vi.fn(),
+        create: vi.fn(),
       },
       event: {
         create: vi.fn(),
@@ -41,6 +52,9 @@ describe('EventsService', () => {
       },
       ticketType: {
         create: vi.fn(),
+      },
+      seat: {
+        createMany: vi.fn(),
       },
     };
 

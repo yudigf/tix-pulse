@@ -24,6 +24,16 @@ export class EventsController {
     return this.eventsService.findAllEvents(city, category);
   }
 
+  @Get('organizer/my-events')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Melihat seluruh event milik organizer yang sedang login beserta KPI' })
+  @ApiResponse({ status: 200, description: 'Daftar event organizer berhasil diambil' })
+  async getMyEvents(@CurrentUser('id') userId: string) {
+    return this.eventsService.getMyEvents(userId);
+  }
+
   @Get(':slug')
   @ApiOperation({ summary: 'Melihat detail event dan ketersediaan tiket berdasarkan slug' })
   @ApiResponse({ status: 200, description: 'Detail event ditemukan' })
